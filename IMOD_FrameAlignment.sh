@@ -1,6 +1,6 @@
 #!/bin/bash
 
-## etomo_framealignment.sh is a script that runs IMOD-based frame alignment
+## IMOD_FrameAlignment.sh is a script that runs IMOD-based frame alignment
 ## on framestacks to make a tiltstack for further processing. The .mrc files
 ## are readable by TOM toolbox by keeping the rawtlt file separated. 
 
