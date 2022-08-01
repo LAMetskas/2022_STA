@@ -1,0 +1,290 @@
+MacroName DoseSymmmetricTomoTest
+# EMBL Heidelberg 2015 Wim J. H. Hagen 
+# modified by Songye Chen
+# Use trial for drift measurement
+# Check autofocus result for more reliable defocus
+# Roll Buffers A-> H. 
+# Uses LowDose
+# Run eucentric fine
+# Track plus  K
+#Track min L
+# Record plus M
+# Record min N
+
+########## SETTINGS ##########
+
+step 	= 3	# stage tilt step in degrees 
+tilttimes	= 10    # multiply by 4 images +  1 image
+Tiltbacklash    = -1 	# negative tilts will be backlashed, must be negative value!
+
+driftcrit 	= 1 	# Angstrom/second
+driftinterval   = 5     # wait time between drift measurements in seconds
+drifttimes 	= 5    # maximum number of drift measurements before skipping
+
+deltadefocus = 0.5   # um
+autofocustimes = 3   # maximum number of times to do autofocus
+
+########## END SETIINGS ##########
+
+Eucentricity 6  #Refine eucentricity and realign 
+UpdateItemZ
+RealignToNavItem 0
+
+tiltangle = 0
+
+CallFunction MyTiltZeroT
+
+# prevent runaway focus
+AbsoluteFocusLimits -10 10
+FocusChangeLimits -2 2
+
+Loop $tilttimes
+     # tilt plus1
+     tiltangle = $tiltangle + $step
+     CallFunction MyTiltPlusT
+     #tilt min1
+     tiltangle = -1 * $tiltangle
+     CallFunction MyTiltMinusT
+     #tilt min2
+     tiltangle = $tiltangle - $step
+     CallFunction MyTiltMinusT
+     # tilt plus2
+     tiltangle = -1 * $tiltangle
+     CallFunction MyTiltPlusT
+EndLoop
+
+TiltTo 0
+ResetImageShift
+SetDefocus 0
+
+function MyTiltZeroT
+   # store stage position
+     ReportStageXYZ
+     StageX = $ReportedValue1
+     StageY = $ReportedValue2
+
+   # drift and tracking
+   T 
+   Copy A K 
+   Copy A L
+   Delay $driftinterval
+   Loop $drifttimes index
+      T
+      AlignTo K
+      ReportAlignShift
+      dx = $reportedValue3 
+      dy = $reportedValue4
+      dist = sqrt ($dx * $dx + $dy * $dy)
+      rate = $dist / $driftinterval * 10 
+      echo Rate = $rate A/sec
+      If $rate < $driftcrit
+         echo Drift is low enough after shot $index
+         break
+      ElseIf $index < $drifttimes
+         Delay $driftinterval
+      Else
+         echo Drift never got below $driftcrit:Skipping ... 
+         break
+      Endif 
+   EndLoop
+
+   #autofocus
+   G
+   ReportDefocus 
+   focusmea = $RepVal1
+   Loop $autofocustimes index
+       G 
+       ReportDefocus 
+       focusdel = abs ($RepVal1 - $focusmea)
+       If $focusdel < $deltadefocus
+          echo Focus is accurate enough after shot $index 
+          break
+       ElseIf $index < $autofocustimes
+          focusmea = $RepVal1
+       Else
+          echo Autofocus shift never below $deltadefocus:Skipping ...
+          break
+       Endif 
+    EndLoop 
+
+     #store defocus 
+     ReportDefocus 
+     focusplus = $RepVal1
+     focusmin = $RepVal1
+     echo Focus is $focusplus after autofocus
+
+     #acquire tilt timage
+     R 
+     S 
+     Copy A M 
+     Copy A N
+   
+     # store image shifts 
+    ReportImageShift
+    ISxplus = $RepVal1
+    ISyplus = $RepVal2
+    ISxminus = $RepVal1
+    ISyminus = $RepVal2
+   
+   # tracking after just to be sure
+   T
+   Copy A K 
+   Copy A L
+   
+endfunction
+   
+function MyTiltPlusT
+   # tiltstage
+   TiltTo $tiltangle
+   
+   # reset stage XY
+   MoveStageTo $StageX $StageY 
+   
+   # set defocus and image shift
+   GoToLowDoseArea R
+   SetDefocus $focusplus
+   SetImageShift $ISxplus $ISyplus
+   
+   #drift and tracking
+   T
+   AlignTo K
+   Delay $driftinterval
+   Loop $drifttimes index
+       T
+       AlignTo K
+       ReportAlignShift
+       dx = $reportedValue3 
+       dy = $reportedValue4
+       dist = sqrt ($dx * $dx + $dy * $dy)
+       rate = $dist / $driftinterval * 10 
+       echo Rate = $rate A/sec
+       If $rate < $driftcrit
+          echo Drift is low enough after shot $index
+          break
+       ElseIf $index < $drifttimes
+          Delay $driftinterval
+       Else
+          echo Drift never got below $driftcrit: Skipping... 
+          break
+       Endif
+   EndLoop
+
+   # autofocus.
+   G
+   ReportDefocus 
+   focusmea = $RepVal1
+   Loop $autofocustimes index
+       G 
+       ReportDefocus 
+       focusdel = abs ($RepVal1 - $focusmea)
+       If $focusdel < $deltadefocus
+          echo Focus is accurate enough after shot $index
+          break
+       ElseIf $index < $autofocustimes
+          focusmea = $RepVal1
+       Else
+          echo Autofocus shift never below $deltadefocus:Skipping ...
+          break
+       Endif 
+   EndLoop 
+
+   # store defocus 
+   ReportDefocus
+   focusplus = $RepVal1
+
+   # acquire tilt image
+   R
+   S
+
+   # tracking after
+   AlignTo M
+   Copy A M
+
+   # store image shifts 
+   ReportImageShift 
+   ISxplus = $RepVal1
+   ISyplus = $RepVal2
+
+   # new track reference
+   T
+   Copy A K
+endfunction
+
+Function MyTiltMinusT
+    # tilt stagewith backlash 
+    TiltTo $tiltangle 
+    TiltBy $Tiltbacklash 
+    TiltTo $tiltangle
+
+    # reset stage XY
+    MoveStageTo $StageX $StageY 
+
+    # set defocus and image shift
+    GoToLowDoseArea R
+    SetDefocus $focusmin
+    SetImageShift $ISxminus $ISyminus
+
+   #drift and tracking
+   T
+   AlignTo L
+   Delay $driftinterval
+   Loop $drifttimes index
+       T
+       AlignTo L
+       ReportAlignShift
+       dx = $reportedValue3 
+       dy = $reportedValue4
+       dist = sqrt ($dx * $dx + $dy * $dy)
+       rate = $dist / $driftinterval * 10 
+       echo Rate = $rate A/sec
+       If $rate < $driftcrit
+          echo Drift is low enough after shot $index
+          break
+       ElseIf $index < $drifttimes
+          Delay $driftinterval
+       Else
+          echo Drift never got below $driftcrit: Skipping... 
+          break
+       Endif
+   EndLoop
+
+   # autofocus.
+   G
+   ReportDefocus 
+   focusmea = $RepVal1
+   Loop $autofocustimes index
+       G 
+       ReportDefocus 
+       focusdel = abs ($RepVal1 - $focusmea)
+       If $focusdel < $deltadefocus
+          echo Focus is accurate enough after shot $index
+          break
+       ElseIf $index < $autofocustimes
+          focusmea = $RepVal1
+       Else
+          echo Autofocus shift never below $deltadefocus:Skipping ...
+          break
+       Endif 
+   EndLoop 
+         
+   #store defocus
+   ReportDefocus
+   focusmin = $RepVal1 
+     
+   # acquire tilt image
+   R
+   S
+     
+   # tracking after
+   AlignTo N
+   Copy A N
+     
+   # store image shifts 
+   ReportImageShift 
+   ISxminus = $RepVal1
+   ISyminus = $RepVal2
+      
+   # new track reference
+   T
+   Copy A L
+endfunction
