@@ -1,0 +1,32 @@
+Dose-Weighting Pseudocode
+
+This pseudocode is provided to allow the user to apply dose-weighting according to their existing pipeline. This may be used as a wrapper for any dose-weighting software, or to create a standalone dose-filtering script.
+
+Users favoring single-software pipelines (emClarity, EMAN2, Relion) are advised against implementing their own dose-weighting to avoid incompatibilities in header, mode and/or normalization.
+
+
+
+Operate:
+1. Define the dose as desired. Our typical options include the product of exposure and dose rate, 2/3 of that product, or a dose calculated by adjusting the pixel size according to the tilt angle.
+
+2. Read in the tilt stack. In Matlab this can be done with dread (Dynamo).
+
+3. Define the order of acquisition for the tilt stack.
+
+4. Assign a dose to each tilt.
+
+5. Define variables and function for dose-weighting. We use the function from the Grigorieff paper cited in the main text.
+
+
+
+Iterate through each tilt of the tilt stack:
+
+6. Generate a filter for the tilt's dose. This can be done by multiplying a spatial frequency array by the dose-weighting function, and then resizing the array to match the dimensions of the tilts. 
+
+7. Take the FFT of the tilt, multiply it by the low-pass filter, and perform an inverse transform to recover a dose-filtered tilt in real space.
+
+x. Alternatively, the dose function can be approximated by modifying and applying a low-pass filter in Dynamo.
+
+
+
+8. Write the output tilt stack. In Matlab this can be done with dwrite (Dynamo).
