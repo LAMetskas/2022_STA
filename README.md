@@ -8,3 +8,4 @@ SerialEM_CollectionScript.txt is a script for data collection on a Titan Krios (
 IMOD_FrameAlignment.sh is a wrapper for the alignframes function in IMOD version 4.9.8
 ctffind4_CorrectOutput.m is a Matlab R2017b script to detect and correct failures in outputs from ctffind4 v. 4.1.13.
 novaCTF_runWBPandSIRT.sh is a wrapper for novaCTF, October 2017 updated release.
+Dynamo_BulkInputOfIMODModels.m is a Matlab R2017b script for Dynamo v 1.1.319, and inputs model2point outputs from IMOD 4.9.8.
